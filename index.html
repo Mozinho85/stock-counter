@@ -1,0 +1,929 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tally — Stock Count</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#c8511b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Tally">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f4efe4; --card:#fffdf7; --ink:#1c1813; --muted:#8b8170;
+    --line:#ded5c2; --line2:#ece4d3; --accent:#c8511b; --accent2:#9a3d12;
+    --good:#2f7d4f; --bad:#bb3b25; --chip:#efe7d6;
+    --shadow:0 1px 0 rgba(0,0,0,.04), 0 8px 24px -16px rgba(40,28,12,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:"Hanken Grotesk",system-ui,sans-serif;color:var(--ink);background:var(--paper);
+    background-image:linear-gradient(rgba(180,160,120,.07) 1px, transparent 1px);background-size:100% 28px;-webkit-font-smoothing:antialiased;}
+  #root{max-width:1100px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+  .mono{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+  .disp{font-family:"Bricolage Grotesque",sans-serif;letter-spacing:-.01em}
+  button{font-family:inherit;cursor:pointer}
+  input{font-family:inherit}
+  .topbar{position:sticky;top:0;z-index:30;background:var(--paper);border-bottom:1.5px solid var(--ink);padding:10px 14px;display:flex;align-items:center;gap:10px}
+  .brand{display:flex;flex-direction:column;line-height:1;flex:1;min-width:0}
+  .brand .b1{font-family:"Bricolage Grotesque";font-weight:800;font-size:20px;letter-spacing:-.02em}
+  .brand .b1 em{font-style:normal;color:var(--accent)}
+  .brand .b2{font-size:11.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .iconbtn{border:1.5px solid var(--ink);background:var(--card);border-radius:10px;width:38px;height:38px;display:grid;place-items:center;font-size:18px;flex:none;color:var(--ink)}
+  .iconbtn:active{transform:translateY(1px)}
+  .live{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted);flex:none}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:.3s}
+  .dot.on{background:var(--good);box-shadow:0 0 0 3px rgba(47,125,79,.18)}
+  .tabs{position:sticky;top:60px;z-index:20;display:flex;gap:6px;overflow-x:auto;padding:10px 12px;background:var(--paper);border-bottom:1px solid var(--line);scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:none;border:1.5px solid var(--line);background:var(--card);color:var(--muted);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:7px;transition:.12s}
+  .tab .num{font-size:10px;opacity:.7}
+  .tab .cnt{font-size:11px;background:var(--chip);border-radius:999px;padding:1px 6px;color:var(--accent2)}
+  .tab.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .tab.on .cnt{background:var(--accent);color:#fff}
+  .tab.tot{border-color:var(--accent);color:var(--accent)}
+  .tab.tot.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .body{flex:1;padding:8px 12px 90px}
+  .count-shell{display:flex;flex-direction:column;height:100vh;height:100dvh}
+  .count-scroll{flex:1;overflow-y:auto;min-height:0;padding:8px 12px 500px}
+  .cathead{font-family:"Bricolage Grotesque";font-weight:800;font-size:15px;margin:10px 4px 6px;display:flex;align-items:baseline;gap:8px}
+  .cathead .num{font-size:11px;color:var(--accent);background:var(--chip);padding:2px 7px;border-radius:6px}
+  .prow{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:4px;overflow:hidden}
+  .phead{display:flex;align-items:center;gap:8px;padding:7px 10px}
+  .pname{flex:1;font-size:14px;font-weight:500;line-height:1.15;transition:font-size .15s,color .15s}
+  .pname.focused{font-size:15.5px;font-weight:700;color:var(--accent)}
+  .ptot{font-family:"IBM Plex Mono";font-weight:600;font-size:16px;min-width:42px;text-align:right}
+  .ptot.zero{color:var(--muted);font-weight:400}
+  .pchev{color:var(--muted);font-size:13px;transition:.15s;flex:none}
+  .prow.open .pchev{transform:rotate(90deg)}
+  .pbody{border-top:1px dashed var(--line);padding:8px 12px 10px;background:#fffef9}
+  .erow{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .erow input{flex:1;border:1.5px solid var(--line);border-radius:9px;padding:10px 11px;font-size:16px;background:#fff;font-family:"IBM Plex Mono";color:var(--ink)}
+  .erow input:focus{outline:none;border-color:var(--accent)}
+  .erow input.err{border-color:var(--bad);background:#fdf3f1}
+  .eeq{font-family:"IBM Plex Mono";font-size:13px;color:var(--muted);min-width:54px;text-align:right}
+  .eeq.bad{color:var(--bad)}
+  .eby{font-size:10px;color:var(--accent2);background:var(--chip);border-radius:6px;padding:2px 6px;flex:none}
+  .edel{border:none;background:none;color:var(--muted);font-size:20px;line-height:1;padding:4px 6px}
+  .addbtn{border:1.5px dashed var(--line);background:none;color:var(--accent2);border-radius:9px;padding:9px;width:100%;font-weight:600;font-size:13px;margin-top:2px}
+  .addbtn:active{background:var(--chip)}
+  .psub{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12px;color:var(--muted)}
+  .psub b{font-family:"IBM Plex Mono";font-size:15px;color:var(--ink)}
+  .hero{padding:30px 18px 8px}
+  .hero h1{font-family:"Bricolage Grotesque";font-weight:800;font-size:32px;line-height:1.0;letter-spacing:-.03em;margin:0 0 12px}
+  .hero h1 em{font-style:normal;color:var(--accent)}
+  .hero p{color:var(--muted);font-size:14px;line-height:1.5;margin:0 0 22px;max-width:38ch}
+  .bigcard{border:2px solid var(--ink);border-radius:16px;background:var(--card);padding:20px;text-align:left;width:100%;margin-bottom:12px;box-shadow:var(--shadow);display:flex;align-items:center;gap:16px}
+  .bigcard:active{transform:translateY(1px)}
+  .bigcard.alt{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .bigcard .ic{font-size:26px;flex:none;width:46px;height:46px;border-radius:12px;display:grid;place-items:center;background:var(--chip);color:var(--accent2)}
+  .bigcard.alt .ic{background:rgba(255,255,255,.12);color:#ffcf9e}
+  .bigcard .t1{font-family:"Bricolage Grotesque";font-weight:800;font-size:18px}
+  .bigcard .t2{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.4}
+  .bigcard.alt .t2{color:#cbbfae}
+  .drop{border:2px dashed var(--ink);border-radius:16px;background:var(--card);padding:22px 18px;text-align:center;box-shadow:var(--shadow);margin-bottom:8px}
+  .drop .big{font-family:"Bricolage Grotesque";font-weight:800;font-size:16px;margin-bottom:4px}
+  .drop .sm{color:var(--muted);font-size:12.5px}
+  .cta{margin-top:14px;background:var(--accent);color:#fff;border:none;border-radius:11px;padding:13px 18px;font-weight:700;font-size:15px;width:100%}
+  .cta:active{background:var(--accent2)}
+  .cta.ghost{background:none;color:var(--ink);border:1.5px solid var(--ink)}
+  .libttl{font-family:"Bricolage Grotesque";font-weight:800;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:22px 4px 10px}
+  .lib{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:9px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow)}
+  .lib .l1{font-weight:700;font-size:14.5px}
+  .lib .l2{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .lib .ldel{margin-left:auto;border:none;background:none;color:var(--muted);font-size:20px;padding:4px 8px;flex:none}
+  .lib .go{margin-left:auto;color:var(--accent);font-size:20px;flex:none}
+  .lib:active{border-color:var(--accent)}
+  .tcat{margin:16px 4px 6px;font-family:"Bricolage Grotesque";font-weight:800;font-size:14px;display:flex;justify-content:space-between;align-items:baseline}
+  .tcat .ts{font-family:"IBM Plex Mono";font-size:13px;color:var(--accent2)}
+  .trow{display:flex;justify-content:space-between;padding:7px 11px;background:var(--card);border:1px solid var(--line2);border-radius:9px;margin-bottom:5px;font-size:13.5px;gap:10px}
+  .trow .tn{flex:1}
+  .trow .tv{font-family:"IBM Plex Mono";font-weight:600}
+  .grand{position:sticky;bottom:0;background:var(--ink);color:var(--paper);border-radius:14px;padding:15px 17px;margin-top:18px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 -6px 20px -10px rgba(0,0,0,.4)}
+  .grand .gl{font-family:"Bricolage Grotesque";font-weight:800;font-size:15px}
+  .grand .gv{font-family:"IBM Plex Mono";font-weight:600;font-size:22px;color:#ffcf9e}
+  .empty{text-align:center;color:var(--muted);padding:44px 20px;font-size:14px}
+  .empty .e1{font-size:34px;margin-bottom:8px}
+  .scrim{position:fixed;inset:0;background:rgba(20,15,8,.42);z-index:40;display:flex;align-items:flex-end;justify-content:center}
+  .panel{background:var(--paper);width:100%;max-width:680px;border-radius:20px 20px 0 0;border-top:2px solid var(--ink);padding:8px 14px 26px;animation:up .22s ease}
+  @keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .grip{width:42px;height:5px;background:var(--line);border-radius:9px;margin:8px auto 12px}
+  .ptitle{font-family:"Bricolage Grotesque";font-weight:800;font-size:18px;margin:2px 2px 14px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:600}
+  .field input{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 12px;font-size:15px}
+  .field input:focus{outline:none;border-color:var(--accent)}
+  .mbtn{width:100%;border:1.5px solid var(--ink);background:var(--card);border-radius:11px;padding:13px;font-weight:600;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:9px}
+  .mbtn:active{background:var(--chip)}
+  .mbtn.danger{border-color:var(--bad);color:var(--bad)}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:11px 18px;border-radius:11px;font-size:13.5px;font-weight:600;z-index:60;box-shadow:0 10px 30px -8px rgba(0,0,0,.5);max-width:90%}
+  .spin{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;margin:0 auto 12px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .pvwrap{padding:6px 4px}
+  .pvcat{font-weight:700;font-size:13px;margin:12px 0 4px;display:flex;gap:7px;align-items:baseline}
+  .pvcat .n{font-size:10px;color:var(--accent);background:var(--chip);padding:1px 6px;border-radius:5px}
+  .pvcat .c{margin-left:auto;font-size:11px;color:var(--muted)}
+  .pvp{font-size:12.5px;color:#5a5345;padding:2px 0 2px 10px}
+  .phead-toggle{flex:1;display:flex;align-items:center;gap:8px;user-select:none;cursor:pointer;min-width:0}
+  .pinput{width:64px;border:1.5px solid var(--line);border-radius:8px;padding:5px 8px;font-size:16px;font-family:"IBM Plex Mono";text-align:right;background:#fff;color:var(--ink);flex:none}
+  .pinput:focus{outline:none;border-color:var(--accent)}
+  .oprow{display:flex;gap:6px;padding:6px 12px 8px;background:var(--card);border-top:1px solid var(--line2)}
+  .opbtn{border:1.5px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:6px 0;font-size:16px;font-family:"IBM Plex Mono";font-weight:600;flex:1}
+  .opbtn:active{background:var(--chip)}
+  .padd{border:none;background:var(--accent);color:#fff;border-radius:999px;width:28px;height:28px;font-size:18px;display:grid;place-items:center;flex:none;padding:0}
+  .padd:active{background:var(--accent2)}
+  .eexpr{font-family:"IBM Plex Mono";font-size:14px;flex:1;color:var(--ink)}
+  .prow.last{border-color:var(--accent);box-shadow:0 0 0 1.5px var(--accent)}
+  .dot.offln{background:var(--accent)}
+  .prow.flagged{border-color:var(--bad);background:#fdf8f7}
+  .pflag{border:none;background:none;font-size:15px;line-height:1;padding:2px 4px;flex:none;color:var(--muted);transition:.12s}
+  .pflag.on{color:var(--bad)}
+  .tab.recount{border-color:var(--bad);color:var(--bad)}
+  .tab.recount.on{background:var(--bad);color:#fff;border-color:var(--bad)}
+  .cat-badge{font-size:10px;color:var(--accent2);background:var(--chip);border-radius:5px;padding:1px 5px;margin-left:5px;font-family:"IBM Plex Mono";flex:none}
+  .config{margin:40px 16px;background:var(--card);border:1.5px solid var(--bad);border-radius:14px;padding:20px}
+  .config h2{font-family:"Bricolage Grotesque";margin:0 0 8px;color:var(--bad)}
+  .config code{background:#f1e7d6;padding:1px 5px;border-radius:4px;font-family:"IBM Plex Mono";font-size:12px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- ============ CONFIG: paste your Supabase key below ============ -->
+<script>
+  window.TALLY_CONFIG = {
+    SUPABASE_URL: "https://ueyoxtaracgkppzerqvv.supabase.co",
+    SUPABASE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVleW94dGFyYWNna3BwemVycXZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMjA2NDgsImV4cCI6MjA5NTc5NjY0OH0.QcnGeU1ul0mnnmFdKtutHRJlP9zBnEAWERG9q4DmqSU"   // legacy anon key (eyJ...) or publishable key (sb_publishable_...)
+  };
+</script>
+<!-- =============================================================== -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+<script>
+  if('serviceWorker' in navigator)
+    navigator.serviceWorker.register('./sw.js');
+</script>
+
+<script type="text/babel">
+const {useState,useEffect,useRef} = React;
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const CFG = window.TALLY_CONFIG;
+const CONFIGURED = CFG && CFG.SUPABASE_KEY && !CFG.SUPABASE_KEY.includes("PASTE");
+const sb = CONFIGURED ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY) : null;
+const POLL_MS = 3000;
+const BUILD_ID = "2026-06-05-parser-dual-cat-v2";
+
+function evalExpr(raw){
+  const s=String(raw==null?"":raw).trim();
+  if(s==="") return {v:0, empty:true};
+  if(!/^[-+*/().\d\s]+$/.test(s)) return {v:NaN};
+  let i=0; const peek=()=>{ while(s[i]===" ") i++; return s[i]; };
+  function expr(){ let v=term(); for(;;){ const c=peek(); if(c==="+"){i++;v+=term();} else if(c==="-"){i++;v-=term();} else return v; } }
+  function term(){ let v=fac(); for(;;){ const c=peek(); if(c==="*"){i++;v*=fac();} else if(c==="/"){i++;v/=fac();} else return v; } }
+  function fac(){ const c=peek(); if(c==="+"){i++;return fac();} if(c==="-"){i++;return -fac();}
+    if(c==="("){i++; const v=expr(); if(peek()===")") i++; return v;} return num(); }
+  function num(){ const st=i; while(/[\d.]/.test(s[i])) i++; if(i===st) return NaN; return parseFloat(s.slice(st,i)); }
+  try{ const v=expr(); return {v:isFinite(v)?v:NaN}; }catch(e){ return {v:NaN}; }
+}
+const fmt = n => !isFinite(n) ? "—" : (Math.round(n*1000)/1000).toString();
+const slug = s => String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"")||"x";
+const when = d => { try{ return new Date(d).toLocaleString([], {dateStyle:"medium", timeStyle:"short"}); }catch(e){ return ""; } };
+
+function newClientId(){
+  return window.crypto?.randomUUID ? crypto.randomUUID() :
+    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{ const r=Math.random()*16|0; return (c==='x'?r:(r&0x3|0x8)).toString(16); });
+}
+// Inserts are keyed by a client-generated UUID so retries/overlapping flushes collapse into the
+// same row (ON CONFLICT DO NOTHING) instead of creating duplicates when an ack is lost offline.
+async function upsertCount(row){
+  const {data,error}=await sb.from("counts").upsert(row,{onConflict:'client_id',ignoreDuplicates:true}).select();
+  if(error) throw error;
+  if(data && data.length) return data[0];
+  const {data:existing,error:selErr}=await sb.from("counts").select().eq('client_id',row.client_id).single();
+  if(selErr) throw selErr;
+  return existing;
+}
+
+async function parsePdf(file){
+  if(!window.pdfjsLib) throw new Error("PDF engine not loaded");
+  const buf = await file.arrayBuffer();
+  let pdf;
+  try{ pdf = await pdfjsLib.getDocument({data:buf}).promise; }
+  catch(primaryErr){
+    // Some browsers with strict privacy settings can block worker startup.
+    // Retry without worker so parsing still succeeds.
+    console.warn('[pdf] worker parse failed, retrying without worker', primaryErr);
+    pdf = await pdfjsLib.getDocument({data:buf, disableWorker:true}).promise;
+  }
+  const pages=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p); const tc=await page.getTextContent(); const rows=[];
+    tc.items.forEach(it=>{ if(it.str==null) return; const x=it.transform[4], y=it.transform[5];
+      let row=rows.find(r=>Math.abs(r.y-y)<=3.2); if(!row){ row={y,parts:[]}; rows.push(row); } row.parts.push({x,str:it.str}); });
+    rows.sort((a,b)=>b.y-a.y);
+    pages.push(rows.map(r=>{ r.parts.sort((a,b)=>a.x-b.x); return r.parts.map(p=>p.str).join(" ").replace(/\s+/g," ").trim(); }).filter(Boolean));
+  }
+  return build(pages);
+}
+function build(pages){
+  const meta=parseMeta(pages[0]||[]); const cats=[]; const byCode={};
+  const isCat=l=>/^(\d{2})\s+\S/.test(l);
+  const isCol=l=>l.replace(/\b(Purchase Name|Closing Quantity|Quantity|Closing|Unit|TOTAL|Name)\b/gi,"").replace(/[\s:]+/g,"")==="";
+  const isNote=l=>/^notes\s*:?/i.test(l);
+  const isMetaLine=t=>/^(Stock Count|Area Name|Site Name|Manager|Stock Type|Period Length|Printed|Page\s+\d+\s+of\s+\d+|Division|From|To|Area\s+\d+|Thread Name|Header)\b/i.test(t);
+  const isValidTextCatName=t=>{ const s=(t||"").trim();
+    if(!s||isCat(s)||isCol(s)||isNote(s)||isMetaLine(s)) return false;
+    if(/[:\d]/.test(s)||s.length>40) return false;
+    if(!/^[A-Za-z][A-Za-z '&\/-]*$/.test(s)) return false;
+    return s.split(/\s+/).length<=4;
+  };
+  const inlineTextCat=line=>{ const t=(line||"").trim();
+    const hdr=t.match(/Header:\s*Sub-Category\s+(.+)$/i); if(hdr&&isValidTextCatName(hdr[1])) return hdr[1].trim();
+    const pre=t.split(/Purchase\s+Name/i)[0].trim(); if(pre!==t&&isValidTextCatName(pre)) return pre;
+    return null;
+  };
+  const isTextCat=(line,nextLine)=>{ const t=(line||"").trim();
+    if(!t||isCat(t)||isCol(t)||isNote(t)) return false;
+    if(!nextLine||!isCol(nextLine)) return false;
+    return isValidTextCatName(t);
+  };
+  const ensure=line=>{ const m=line.match(/^(\d{2})\s+(.+)$/); const code=m[1],name=m[2].trim();
+    if(byCode[code]) return byCode[code]; const c={code,name,id:code,products:[]}; byCode[code]=c; cats.push(c); return c; };
+  const ensureText=line=>{ const name=line.trim(),code="txt_"+slug(name);
+    if(byCode[code]) return byCode[code]; const c={code,name,id:code,products:[]}; byCode[code]=c; cats.push(c); return c; };
+  pages.forEach(lines=>{ let started=false,cur=null;
+    for(let i=0;i<lines.length;i++){
+      const line=lines[i], nextLine=lines[i+1]||"";
+      const inlineCat=inlineTextCat(line);
+      if(!started){ if(isCat(line)){ started=true; cur=ensure(line); }
+        else if(inlineCat){ started=true; cur=ensureText(inlineCat); }
+        else if(isTextCat(line,nextLine)){ started=true; cur=ensureText(line); }
+        continue; }
+      if(isCat(line)){ cur=ensure(line); continue; }
+      if(inlineCat){ cur=ensureText(inlineCat); continue; }
+      if(isTextCat(line,nextLine)){ cur=ensureText(line); continue; }
+      if(isCol(line)||isNote(line)) continue;
+      if(!cur) continue; const name=line.trim(); if(!name) continue;
+      if(!cur.products.some(p=>p.name===name)) cur.products.push({id:cur.code+"|"+name, name});
+    }});
+  return {meta, categories:cats};
+}
+function parseMeta(lines){
+  const all=lines.join("  "); const g=re=>{ const m=all.match(re); return m?m[1].trim():""; };
+  const ft=all.match(/From:\s*([\d/]+)\s*To:\s*([\d/]+)/);
+  return { division:g(/Division:\s*([A-Za-z][A-Za-z ]*?)(?:\s{2,}|Period|From|$)/)||"Stock",
+    from:ft?ft[1]:"", to:ft?ft[2]:"", site:g(/Site Name:\s*(.+?)\s+Printed/)||g(/Site Name:\s*(.+?)$/),
+    area:g(/Area Name:\s*(.+?)(?:\s+Stock Count|\s+Page|$)/), taker:g(/Stock Taker:\s*([A-Za-z]+)/),
+    printed:g(/Printed\s*:\s*([\d/]+\s+[\d:]+)/) }; }
+function sheetIdFor(m){ return "sh_"+slug([m.division,m.from,m.to,m.site].join("_")); }
+function sheetLabel(m){ const a=[m.division,m.site||m.area].filter(Boolean).join(" · ");
+  const d=(m.from&&m.to)?(m.from+"–"+m.to):""; return [a,d].filter(Boolean).join("  "); }
+
+function App(){
+  const [ready,setReady]=useState(false);
+  const [view,setView]=useState("home");          // home | pick | preview | join | count
+  const [sheets,setSheets]=useState([]);           // templates
+  const [sessions,setSessions]=useState([]);
+  const [sessionCounters,setSessionCounters]=useState({});       // counts
+  const [preview,setPreview]=useState(null);
+  const [sheet,setSheet]=useState(null);           // structure of the active count
+  const [session,setSession]=useState(null);       // active count session
+  const [counts,setCounts]=useState({});
+  const [activeCat,setActiveCat]=useState(null);
+  const [open,setOpen]=useState({});
+  const [drafts,setDrafts]=useState({});
+  const [focusedPid,setFocusedPid]=useState(null);
+  const [lastPid,setLastPid]=useState(null);
+  const [flagged,setFlagged]=useState(new Set());
+  const [recountCounts,setRecountCounts]=useState({});
+  const [counter,setCounter]=useState(localStorage.getItem("tally_counter")||"");
+  const [busy,setBusy]=useState(false);
+  const [menu,setMenu]=useState(false);
+  const [toast,setToast]=useState("");
+  const [uploadStatus,setUploadStatus]=useState("");
+  const [showAll,setShowAll]=useState(false);
+  const [synced,setSynced]=useState(false);
+  const [isOnline,setIsOnline]=useState(navigator.onLine);
+  const [soundOn,setSoundOn]=useState(localStorage.getItem('tally_sound')!=='off');
+  const [pendingCount,setPendingCount]=useState(()=>{ try{ return JSON.parse(localStorage.getItem('tally_queue')||'[]').length; }catch(e){ return 0; } });
+  const [authPanel,setAuthPanel]=useState(null);
+  const [authName,setAuthName]=useState('');
+  const [authPin,setAuthPin]=useState('');
+  const [authPinConfirm,setAuthPinConfirm]=useState('');
+  const [authError,setAuthError]=useState('');
+  const fileRef=useRef(); const pollRef=useRef(); const focusRef=useRef(null);
+  const saveTs=useRef({}); const dirtyRef=useRef(new Set()); const flushQueueRef=useRef(null); const flagDirtyRef=useRef(false); const flushingRef=useRef(false);
+  const draftSaveTimerRef=useRef(null); const audioCtxRef=useRef(null); const offlineChimeRef=useRef(null);
+
+  const flash=m=>{ setToast(m); clearTimeout(flash._t); flash._t=setTimeout(()=>setToast(""),2200); };
+
+  function ensureAudioCtx(){ try{ if(!audioCtxRef.current) audioCtxRef.current=new(window.AudioContext||window.webkitAudioContext)(); if(audioCtxRef.current.state==='suspended') audioCtxRef.current.resume(); }catch(e){} }
+  function playChime(type){ const ctx=audioCtxRef.current; if(!ctx) return; try{ if(ctx.state==='suspended') ctx.resume(); (type==='offline'?[[880,0],[659,0.22]]:[[659,0],[880,0.18]]).forEach(([freq,delay])=>{ const osc=ctx.createOscillator(); const gain=ctx.createGain(); osc.type='sine'; osc.frequency.value=freq; const t=ctx.currentTime+delay; gain.gain.setValueAtTime(0,t); gain.gain.linearRampToValueAtTime(0.22,t+0.012); gain.gain.exponentialRampToValueAtTime(0.001,t+0.35); osc.connect(gain); gain.connect(ctx.destination); osc.start(t); osc.stop(t+0.38); }); }catch(e){} }
+
+  useEffect(()=>{ if(!CONFIGURED) return; if(navigator.storage?.persist) navigator.storage.persist(); (async()=>{
+    try{ const {data:{session:ses}}=await sb.auth.getSession(); if(!ses) await sb.auth.signInAnonymously();
+      await Promise.all([loadSheets(),loadSessions()]);
+      if(navigator.onLine) flushQueueRef.current&&flushQueueRef.current(); }
+    catch(e){ console.error(e);
+      const cs=localStorage.getItem('tally_sessions_list'); if(cs) setSessions(JSON.parse(cs));
+      const ch=localStorage.getItem('tally_sheets_list'); if(ch) setSheets(JSON.parse(ch));
+      flash(navigator.onLine?"Connection problem — check the key & policies.":"Offline — showing cached data"); }
+    setReady(true);
+  })(); },[]);
+  useEffect(()=>()=>{ if(pollRef.current) clearInterval(pollRef.current); },[]);
+  useEffect(()=>{
+    const init=()=>ensureAudioCtx();
+    document.addEventListener('touchstart',init,{once:true,passive:true});
+    document.addEventListener('click',init,{once:true,passive:true});
+    return ()=>{ document.removeEventListener('touchstart',init); document.removeEventListener('click',init); };
+  },[]);
+  useEffect(()=>{
+    const on=()=>{ setIsOnline(true); clearInterval(offlineChimeRef.current); offlineChimeRef.current=null; playChime('online'); flushQueueRef.current&&flushQueueRef.current(); };
+    const off=()=>{ setIsOnline(false); playChime('offline'); offlineChimeRef.current=setInterval(()=>{ const q=JSON.parse(localStorage.getItem('tally_queue')||'[]'); if(q.length>0) playChime('offline'); },60000); };
+    window.addEventListener('online',on); window.addEventListener('offline',off);
+    return ()=>{ window.removeEventListener('online',on); window.removeEventListener('offline',off); clearInterval(offlineChimeRef.current); };
+  },[]);
+  useEffect(()=>{
+    if(!session) return;
+    clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current=setTimeout(()=>localStorage.setItem('tally_drafts_'+session.id,JSON.stringify(drafts)),500);
+    const onHide=()=>localStorage.setItem('tally_drafts_'+session.id,JSON.stringify(drafts));
+    window.addEventListener('pagehide',onHide);
+    return ()=>{ clearTimeout(draftSaveTimerRef.current); window.removeEventListener('pagehide',onHide); };
+  },[drafts,session]);
+  useEffect(()=>{
+    const onUnload=e=>{ const q=JSON.parse(localStorage.getItem('tally_queue')||'[]'); if(q.length||dirtyRef.current.size>0){ e.preventDefault(); e.returnValue=''; } };
+    window.addEventListener('beforeunload',onUnload);
+    return ()=>window.removeEventListener('beforeunload',onUnload);
+  },[]);
+  useEffect(()=>{
+    const handler=e=>{ if(e.data?.type==='FLUSH_QUEUE') flushQueueRef.current?.(); };
+    if(navigator.serviceWorker) navigator.serviceWorker.addEventListener('message',handler);
+    return ()=>{ if(navigator.serviceWorker) navigator.serviceWorker.removeEventListener('message',handler); };
+  },[]);
+
+  async function loadSheets(){
+    const {data,error}=await sb.from("sheets").select("id,label,cat_count,prod_count,created_at").order("created_at",{ascending:false});
+    if(!error&&data){ setSheets(data); localStorage.setItem('tally_sheets_list',JSON.stringify(data)); }
+    else{ const c=localStorage.getItem('tally_sheets_list'); if(c) setSheets(JSON.parse(c)); }
+  }
+  async function loadSessions(){
+    const {data,error}=await sb.from("sessions").select("id,label,sheet_id,created_at,status").order("created_at",{ascending:false});
+    if(!error&&data){
+      setSessions(data); localStorage.setItem('tally_sessions_list',JSON.stringify(data));
+      if(data.length){
+        const {data:ctrs}=await sb.from("counts").select("session_id,counter").in("session_id",data.map(s=>s.id)).not("counter","is",null).neq("counter","");
+        if(ctrs){
+          const map={};
+          ctrs.forEach(r=>{ if(!map[r.session_id]) map[r.session_id]=new Set(); map[r.session_id].add(r.counter); });
+          const result={}; Object.entries(map).forEach(([k,v])=>result[k]=[...v]);
+          setSessionCounters(result); localStorage.setItem('tally_session_counters',JSON.stringify(result));
+        }
+      }
+    } else {
+      const c=localStorage.getItem('tally_sessions_list'); if(c) setSessions(JSON.parse(c));
+      const cc=localStorage.getItem('tally_session_counters'); if(cc) setSessionCounters(JSON.parse(cc));
+    }
+  }
+
+  function goHome(){ stopPoll(); if(session) localStorage.removeItem('tally_drafts_'+session.id); setSheet(null); setSession(null); setCounts({}); setLastPid(null); setFlagged(new Set()); setRecountCounts({}); setDrafts({}); dirtyRef.current.clear(); setView("home"); }
+  function goPick(){ loadSheets(); setView("pick"); }
+  function goJoin(){ loadSessions(); setView("join"); }
+
+  async function onFile(e){ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f){ setUploadStatus("No file selected"); return; }
+    setUploadStatus("Selected: "+f.name+" — parsing PDF…");
+    setBusy(true);
+    try{ const r=await parsePdf(f);
+      const prod=r.categories.reduce((a,c)=>a+c.products.length,0);
+      console.info('[upload]', BUILD_ID, 'parsed', {file:f.name, categories:r.categories.length, products:prod});
+      if(!r.categories.length){ setUploadStatus("Parsed 0 categories / 0 products"); flash("No products found — right PDF?"); setBusy(false); return; }
+      setUploadStatus("Parsed "+r.categories.length+" categories / "+prod+" products");
+      setPreview({...r, id:sheetIdFor(r.meta), label:sheetLabel(r.meta)}); setView("preview");
+    }catch(err){ console.error(err); setUploadStatus("Parse failed: "+(err&&err.message?err.message:'parse error')); flash("Couldn't read that PDF: "+(err&&err.message?err.message:'parse error')); }
+    setBusy(false); }
+
+  async function confirmImport(){
+    const s=preview; const prod=s.categories.reduce((a,c)=>a+c.products.length,0);
+    const {error}=await sb.from("sheets").upsert({ id:s.id, label:s.label, meta:s.meta, categories:s.categories, cat_count:s.categories.length, prod_count:prod });
+    if(error){ flash("Save failed: "+error.message); return; }
+    await loadSheets(); await startSession(s.id, s.label);
+  }
+
+  async function doCreateSession(sheetId, label, pin){
+    setBusy(true);
+    const {data:ses,error}=await sb.from("sessions").insert({sheet_id:sheetId,label,pin}).select().single();
+    if(error){ flash("Couldn't start count: "+error.message); setBusy(false); return; }
+    localStorage.setItem('tally_pin_'+ses.id, pin);
+    await loadSessions(); await openSession(ses.id); flash("New count started");
+  }
+
+  async function handleAuthConfirm(){
+    const name=counter||authName.trim();
+    if(!name){ setAuthError('Please enter your name'); return; }
+    if(authPanel.mode==='create'){
+      if(authPin.length!==4){ setAuthError('PIN must be 4 digits'); return; }
+      if(authPin!==authPinConfirm){ setAuthError("PINs don't match"); return; }
+      saveCounter(name); setAuthPanel(null);
+      await doCreateSession(authPanel.sheetId, authPanel.label, authPin);
+    } else {
+      setBusy(true);
+      const {data:ses}=await sb.from("sessions").select("pin").eq("id",authPanel.id).single();
+      if(ses?.pin && ses.pin!==authPin){ setAuthError('Incorrect PIN'); setBusy(false); return; }
+      saveCounter(name); localStorage.setItem('tally_pin_'+authPanel.id, authPin);
+      setAuthPanel(null); await openSession(authPanel.id);
+    }
+  }
+
+  function stopPoll(){ if(pollRef.current){ clearInterval(pollRef.current); pollRef.current=null; } setSynced(false); }
+
+  async function startSession(sheetId, knownLabel){
+    setBusy(true);
+    let label=knownLabel;
+    if(!label){ const {data:sh}=await sb.from("sheets").select("label").eq("id",sheetId).single(); label=(sh&&sh.label)||"Count"; }
+    setBusy(false);
+    setAuthName(counter); setAuthPin(''); setAuthPinConfirm(''); setAuthError('');
+    setAuthPanel({mode:'create', sheetId, label});
+  }
+
+  async function openSession(id){
+    setBusy(true); setView("count");
+    let ses,sh,rows;
+    try{
+      const {data:sesData,error}=await sb.from("sessions").select("*").eq("id",id).single();
+      if(error||!sesData){ flash("Couldn't open count"); goHome(); setBusy(false); return; }
+      ses=sesData; localStorage.setItem('tally_session_'+id,JSON.stringify(ses));
+      const {data:shData}=await sb.from("sheets").select("*").eq("id",ses.sheet_id).single();
+      if(!shData){ flash("This count's sheet is missing"); goHome(); setBusy(false); return; }
+      sh=shData; localStorage.setItem('tally_sheet_'+ses.sheet_id,JSON.stringify(sh));
+      const {data:rowsData}=await sb.from("counts").select("*").eq("session_id",id);
+      rows=rowsData||[]; localStorage.setItem('tally_counts_'+id,JSON.stringify(rows));
+    }catch(e){
+      const cachedSes=localStorage.getItem('tally_session_'+id);
+      if(!cachedSes){ flash("Open this session online first to cache it"); goHome(); setBusy(false); return; }
+      ses=JSON.parse(cachedSes);
+      const cachedSh=localStorage.getItem('tally_sheet_'+ses.sheet_id);
+      if(!cachedSh){ flash("Sheet data not cached — open online first"); goHome(); setBusy(false); return; }
+      sh=JSON.parse(cachedSh);
+      const cachedRows=localStorage.getItem('tally_counts_'+id);
+      rows=cachedRows?JSON.parse(cachedRows):[]; flash("Offline — showing cached data");
+    }
+    const grouped={}; const rcGrouped={};
+    rows.forEach(r=>{ const entry={id:r.id,expr:r.expr||"",counter:r.counter||""}; if(r.is_recount){ (rcGrouped[r.product_id]=rcGrouped[r.product_id]||[]).push(entry); } else { (grouped[r.product_id]=grouped[r.product_id]||[]).push(entry); } });
+    dirtyRef.current.clear();
+    setSheet(sh); setSession(ses); setCounts(grouped); setRecountCounts(rcGrouped); setActiveCat(sh.categories[0]?.id||"totals"); setOpen({}); setPreview(null); setSynced(true);
+    const savedSession=localStorage.getItem("tally_last_session");
+    setLastPid(savedSession===id ? localStorage.getItem("tally_last_pid") : null);
+    const flagArr=ses.flagged_products||JSON.parse(localStorage.getItem('tally_flagged_'+id)||'[]');
+    setFlagged(new Set(flagArr));
+    const savedDrafts=localStorage.getItem('tally_drafts_'+id);
+    if(savedDrafts){ try{ setDrafts(JSON.parse(savedDrafts)); }catch(e){} }
+    stopPoll(); pollRef.current=setInterval(()=>refreshCounts(id), POLL_MS);
+    setBusy(false);
+  }
+
+  async function refreshCounts(id){
+    const [{data:rows,error},{data:sesData}]=await Promise.all([
+      sb.from("counts").select("*").eq("session_id",id),
+      sb.from("sessions").select("flagged_products").eq("id",id).single()
+    ]);
+    if(error){ setSynced(false); return; }
+    setSynced(true);
+    if(rows) localStorage.setItem('tally_counts_'+id, JSON.stringify(rows));
+    if(!flagDirtyRef.current && sesData?.flagged_products) setFlagged(new Set(sesData.flagged_products));
+    const mainRows=(rows||[]).filter(r=>!r.is_recount);
+    const rcRows=(rows||[]).filter(r=>r.is_recount);
+    const grouped={};
+    mainRows.forEach(r=>{ (grouped[r.product_id]=grouped[r.product_id]||[]).push(r); });
+    const pendingTempIds=new Set(
+      JSON.parse(localStorage.getItem('tally_queue')||'[]').filter(x=>x.op==='insert').map(x=>x.tempId)
+    );
+    setCounts(prev=>{
+      const next={...prev};
+      const pids=new Set([...Object.keys(prev),...Object.keys(grouped)]);
+      pids.forEach(pid=>{
+        const localArr=prev[pid]||[]; const serverArr=grouped[pid]||[];
+        const sById={}; serverArr.forEach(r=>sById[r.id]=r);
+        let merged=localArr.filter(e=> sById[e.id] || dirtyRef.current.has(e.id) || focusRef.current===e.id || (e.id&&e.id.startsWith('temp_')&&pendingTempIds.has(e.id)) )
+          .map(e=>{ if(dirtyRef.current.has(e.id)||focusRef.current===e.id) return e;
+            const r=sById[e.id]; return r?{id:r.id,expr:r.expr||"",counter:r.counter||""}:e; });
+        const have=new Set(merged.map(e=>e.id));
+        const hasPendingTemp=merged.some(e=>e.id&&e.id.startsWith('temp_'));
+        if(!hasPendingTemp){
+          serverArr.forEach(r=>{ if(!have.has(r.id)) merged.push({id:r.id,expr:r.expr||"",counter:r.counter||""}); });
+        }
+        const seen=new Set(); merged=merged.filter(e=>{ if(seen.has(e.id)) return false; seen.add(e.id); return true; });
+        if(merged.length) next[pid]=merged; else delete next[pid];
+      });
+      return next;
+    });
+    const rcGrouped={};
+    rcRows.forEach(r=>{ (rcGrouped[r.product_id]=rcGrouped[r.product_id]||[]).push({id:r.id,expr:r.expr||"",counter:r.counter||""}); });
+    setRecountCounts(prev=>{
+      const next={...prev};
+      const pids=new Set([...Object.keys(prev),...Object.keys(rcGrouped)]);
+      pids.forEach(pid=>{
+        const tempEntries=(prev[pid]||[]).filter(e=>e.id.startsWith('temp_')&&pendingTempIds.has(e.id));
+        let merged=[...(rcGrouped[pid]||[]),...tempEntries];
+        const seen=new Set(); merged=merged.filter(e=>{ if(seen.has(e.id)) return false; seen.add(e.id); return true; });
+        if(merged.length) next[pid]=merged; else delete next[pid];
+      });
+      return next;
+    });
+  }
+
+  const entriesOf=pid=>counts[pid]||[];
+  const productTotal=pid=>entriesOf(pid).reduce((a,e)=>{ const r=evalExpr(e.expr); return a+(isFinite(r.v)?r.v:0); },0);
+
+  async function flushQueue(){
+    if(flushingRef.current) return;
+    flushingRef.current=true;
+    try{
+    const raw=localStorage.getItem('tally_queue'); if(!raw) return;
+    const queue=JSON.parse(raw); if(!queue.length) return;
+    for(const item of queue){
+      try{
+        if(item.op==='insert'){
+          const data=await upsertCount({client_id:item.clientId,session_id:item.sessionId,sheet_id:item.sheetId,product_id:item.pid,expr:item.expr,counter:item.counter,...(item.isRecount?{is_recount:true}:{})});
+          const setter=item.isRecount?setRecountCounts:setCounts;
+          setter(c=>({...c,[item.pid]:(c[item.pid]||[]).map(e=>e.id===item.tempId?{id:data.id,expr:item.expr,counter:item.counter}:e)}));
+        } else if(item.op==='delete'&&!item.entryId.startsWith('temp_')){
+          await sb.from("counts").delete().eq("id",item.entryId);
+        } else if(item.op==='update'){
+          await sb.from("counts").update({expr:item.expr,updated_at:new Date().toISOString()}).eq("id",item.entryId);
+        }
+        const live=JSON.parse(localStorage.getItem('tally_queue')||'[]');
+        if(item.qid){
+          localStorage.setItem('tally_queue',JSON.stringify(live.filter(x=>x.qid!==item.qid)));
+        } else {
+          let removed=false;
+          localStorage.setItem('tally_queue',JSON.stringify(live.filter(x=>{
+            if(removed) return true;
+            const match=x.op===item.op&&(item.op==='insert'?x.tempId===item.tempId:x.entryId===item.entryId);
+            if(match){ removed=true; return false; } return true;
+          })));
+        }
+      }catch(e){ /* leave in queue for retry */ }
+    }
+    const live=JSON.parse(localStorage.getItem('tally_queue')||'[]');
+    if(!live.length) localStorage.removeItem('tally_queue');
+    setPendingCount(live.length);
+    } finally { flushingRef.current=false; }
+  }
+  async function addQuickEntry(pid, expr){
+    const v=String(expr||"").trim(); if(!v) return;
+    const tempId='temp_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const clientId=newClientId();
+    setCounts(c=>({...c,[pid]:[...(c[pid]||[]),{id:tempId,expr:v,counter}]}));
+    setLastPid(pid);
+    localStorage.setItem("tally_last_pid", pid);
+    localStorage.setItem("tally_last_session", session.id);
+    setDrafts(d=>({...d,[pid]:""})); playSubmitSound();
+    const enqueue=()=>{
+      const qid='q_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const q=JSON.parse(localStorage.getItem('tally_queue')||'[]');
+      q.push({op:'insert',tempId,clientId,pid,expr:v,counter,sessionId:session.id,sheetId:sheet.id,qid});
+      localStorage.setItem('tally_queue',JSON.stringify(q));
+      const cached=JSON.parse(localStorage.getItem('tally_counts_'+session.id)||'[]');
+      cached.push({id:tempId,product_id:pid,expr:v,counter,session_id:session.id,sheet_id:sheet.id,is_recount:false});
+      localStorage.setItem('tally_counts_'+session.id,JSON.stringify(cached));
+      setPendingCount(q.length);
+      if('serviceWorker' in navigator && 'SyncManager' in window) navigator.serviceWorker.ready.then(r=>r.sync.register('tally-flush').catch(()=>{}));
+    };
+    if(!navigator.onLine){ enqueue(); flash("Saved offline — will sync when online"); return; }
+    try{
+      const data=await upsertCount({client_id:clientId,session_id:session.id,sheet_id:sheet.id,product_id:pid,expr:v,counter});
+      setCounts(c=>({...c,[pid]:(c[pid]||[]).map(e=>e.id===tempId?{id:data.id,expr:v,counter}:e)}));
+    }catch(e){ enqueue(); flash("Saved offline — will sync when online"); }
+  }
+  async function addEntry(pid){
+    const {data,error}=await sb.from("counts").insert({session_id:session.id,sheet_id:sheet.id,product_id:pid,expr:"",counter}).select().single();
+    if(error){ flash("Add failed"); return; }
+    setCounts(c=>({...c,[pid]:[...(c[pid]||[]),{id:data.id,expr:"",counter}]}));
+  }
+  function setEntry(pid,id,expr){
+    setCounts(c=>({...c,[pid]:(c[pid]||[]).map(e=>e.id===id?{...e,expr}:e)}));
+    dirtyRef.current.add(id);
+    clearTimeout(saveTs.current[id]);
+    saveTs.current[id]=setTimeout(async()=>{
+      const enqueueUpdate=()=>{
+        const q=JSON.parse(localStorage.getItem('tally_queue')||'[]');
+        const qid='q_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+        const idx=q.findIndex(x=>x.op==='update'&&x.entryId===id);
+        const item={op:'update',entryId:id,pid,expr,sessionId:session.id,qid};
+        if(idx>=0) q[idx]=item; else q.push(item);
+        localStorage.setItem('tally_queue',JSON.stringify(q));
+        setPendingCount(q.length);
+      };
+      if(!navigator.onLine){ enqueueUpdate(); dirtyRef.current.delete(id); return; }
+      try{
+        await sb.from("counts").update({expr,updated_at:new Date().toISOString()}).eq("id",id);
+        dirtyRef.current.delete(id);
+      }catch(e){ enqueueUpdate(); dirtyRef.current.delete(id); }
+    },450);
+  }
+  async function delEntry(pid,id){
+    dirtyRef.current.delete(id);
+    setCounts(c=>({...c,[pid]:(c[pid]||[]).filter(e=>e.id!==id)}));
+    if(id.startsWith('temp_')){
+      const q=JSON.parse(localStorage.getItem('tally_queue')||'[]');
+      localStorage.setItem('tally_queue',JSON.stringify(q.filter(x=>!(x.op==='insert'&&x.tempId===id))));
+      setPendingCount(JSON.parse(localStorage.getItem('tally_queue')||'[]').length);
+      return;
+    }
+    const enqueue=()=>{
+      const q=JSON.parse(localStorage.getItem('tally_queue')||'[]');
+      q.push({op:'delete',entryId:id,pid,sessionId:session.id,qid:'q_'+Date.now()+'_'+Math.random().toString(36).slice(2)});
+      localStorage.setItem('tally_queue',JSON.stringify(q));
+      setPendingCount(q.length);
+    };
+    if(!navigator.onLine){ enqueue(); return; }
+    try{ await sb.from("counts").delete().eq("id",id); }catch(e){ enqueue(); }
+  }
+  function toggle(pid){ setOpen(o=>({...o,[pid]:!o[pid]})); }
+  async function toggleFlag(pid){
+    const n=new Set(flagged); n.has(pid)?n.delete(pid):n.add(pid);
+    const arr=[...n]; setFlagged(n);
+    localStorage.setItem('tally_flagged_'+session.id,JSON.stringify(arr));
+    flagDirtyRef.current=true;
+    await sb.from("sessions").update({flagged_products:arr}).eq("id",session.id);
+    flagDirtyRef.current=false;
+  }
+  async function addRecountEntry(pid, expr){
+    const v=String(expr||"").trim(); if(!v) return;
+    const tempId='temp_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+    const clientId=newClientId();
+    setRecountCounts(c=>({...c,[pid]:[...(c[pid]||[]),{id:tempId,expr:v,counter}]}));
+    setDrafts(d=>({...d,[pid]:""})); playSubmitSound();
+    const enqueue=()=>{
+      const qid='q_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const q=JSON.parse(localStorage.getItem('tally_queue')||'[]');
+      q.push({op:'insert',tempId,clientId,pid,expr:v,counter,sessionId:session.id,sheetId:sheet.id,isRecount:true,qid});
+      localStorage.setItem('tally_queue',JSON.stringify(q));
+      const cached=JSON.parse(localStorage.getItem('tally_counts_'+session.id)||'[]');
+      cached.push({id:tempId,product_id:pid,expr:v,counter,session_id:session.id,sheet_id:sheet.id,is_recount:true});
+      localStorage.setItem('tally_counts_'+session.id,JSON.stringify(cached));
+      setPendingCount(q.length);
+      if('serviceWorker' in navigator && 'SyncManager' in window) navigator.serviceWorker.ready.then(r=>r.sync.register('tally-flush').catch(()=>{}));
+    };
+    if(!navigator.onLine){ enqueue(); flash("Saved offline — will sync when online"); return; }
+    try{
+      const data=await upsertCount({client_id:clientId,session_id:session.id,sheet_id:sheet.id,product_id:pid,expr:v,counter,is_recount:true});
+      setRecountCounts(c=>({...c,[pid]:(c[pid]||[]).map(e=>e.id===tempId?{id:data.id,expr:v,counter}:e)}));
+    }catch(e){ enqueue(); flash("Saved offline — will sync when online"); }
+  }
+  async function delRecountEntry(pid, id){
+    setRecountCounts(c=>({...c,[pid]:(c[pid]||[]).filter(e=>e.id!==id)}));
+    if(id.startsWith('temp_')){
+      const q=JSON.parse(localStorage.getItem('tally_queue')||'[]');
+      localStorage.setItem('tally_queue',JSON.stringify(q.filter(x=>!(x.op==='insert'&&x.tempId===id))));
+      setPendingCount(JSON.parse(localStorage.getItem('tally_queue')||'[]').length);
+      return;
+    }
+    const enqueue=()=>{
+      const q=JSON.parse(localStorage.getItem('tally_queue')||'[]');
+      q.push({op:'delete',entryId:id,pid,sessionId:session.id,qid:'q_'+Date.now()+'_'+Math.random().toString(36).slice(2)});
+      localStorage.setItem('tally_queue',JSON.stringify(q));
+      setPendingCount(q.length);
+    };
+    if(!navigator.onLine){ enqueue(); return; }
+    try{ await sb.from("counts").delete().eq("id",id); }catch(e){ enqueue(); }
+  }
+  function appendOp(pid,ch){ setDrafts(d=>({...d,[pid]:(d[pid]||'')+ch})); }
+  function saveCounter(v){ setCounter(v); localStorage.setItem("tally_counter",v); }
+  function playSubmitSound(){
+    if(!soundOn) return;
+    try{
+      if(!audioCtxRef.current||audioCtxRef.current.state==='closed') audioCtxRef.current=new(window.AudioContext||window.webkitAudioContext)();
+      const ctx=audioCtxRef.current; if(ctx.state==='suspended') ctx.resume();
+      const osc=ctx.createOscillator(); const gain=ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type='sine'; osc.frequency.value=880;
+      gain.gain.setValueAtTime(0.18,ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.12);
+      osc.start(); osc.stop(ctx.currentTime+0.12);
+    }catch(e){}
+  }
+
+  async function delSheetTemplate(id,e){ e&&e.stopPropagation();
+    if(!confirm("Delete this saved count sheet? Any counts made from it are removed too.")) return;
+    await sb.from("sheets").delete().eq("id",id); await Promise.all([loadSheets(),loadSessions()]); }
+  async function delSessionRow(id,e){ e&&e.stopPropagation();
+    if(!confirm("Delete this count and all its entries?")) return;
+    await sb.from("sessions").delete().eq("id",id); await loadSessions(); }
+  async function delCurrentSession(){
+    if(!confirm("Delete this count and all its entries? (The count sheet stays for reuse.)")) return;
+    const id=session.id; setMenu(false); goHome(); await sb.from("sessions").delete().eq("id",id); await loadSessions(); }
+
+  function exportCsv(){
+    const rows=[["Category","Product","Total"]];
+    sheet.categories.forEach(c=>c.products.forEach(p=>{ const t=productTotal(p.id); if(t!==0||showAll) rows.push([c.code+" "+c.name,p.name,fmt(t)]); }));
+    const csv=rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(",")).join("\n");
+    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+    a.download="totals_"+slug(sheet.label)+".csv"; a.click(); setMenu(false); flash("Totals exported");
+  }
+
+  flushQueueRef.current=flushQueue;
+
+  function renderProw(p, catBadge=null, isRecount=false){
+    const es = isRecount ? (recountCounts[p.id]||[]) : entriesOf(p.id);
+    const t = isRecount ? es.reduce((a,e)=>{ const r=evalExpr(e.expr); return a+(isFinite(r.v)?r.v:0); },0) : productTotal(p.id);
+    const isOpen=!!open[p.id]; const draft=drafts[p.id]||""; const isFlagged=flagged.has(p.id);
+    const doAdd=()=>{ isRecount ? addRecountEntry(p.id,draft) : addQuickEntry(p.id,draft); };
+    const doDel=(id)=>{ isRecount ? delRecountEntry(p.id,id) : delEntry(p.id,id); };
+    return (<div className={"prow"+(isOpen?" open":"")+(isFlagged?" flagged":"")+(p.id===lastPid?" last":"")} key={p.id}>
+      <div className="phead">
+        <div className="phead-toggle" onClick={()=>toggle(p.id)}><span className="pchev">▶</span>
+          <span className={"pname"+(focusedPid===p.id?" focused":"")}>{p.name}</span>{catBadge && <span className="cat-badge">{catBadge}</span>}</div>
+        <input className="pinput" value={draft} placeholder="qty" inputMode="decimal"
+          autoCapitalize="off" autoCorrect="off" onClick={e=>e.stopPropagation()}
+          onFocus={()=>setFocusedPid(p.id)} onBlur={()=>setFocusedPid(null)}
+          onChange={e=>setDrafts(d=>({...d,[p.id]:e.target.value}))}
+          onKeyDown={e=>{ if(e.key==="Enter"){e.preventDefault();doAdd();} }}/>
+        <button className="padd" onClick={e=>{e.stopPropagation();doAdd();}}>+</button>
+        <button className={"pflag"+(isFlagged?" on":"")} onClick={e=>{e.stopPropagation();toggleFlag(p.id);}}>⚑</button>
+        <span className={"ptot"+(t===0?" zero":"")}>{t===0?"0":fmt(t)}</span>
+      </div>
+      {focusedPid===p.id && (<div className="oprow" onClick={e=>e.stopPropagation()}>
+        {[['×','*'],['+','+'],['\u2212','-'],['÷','/']].map(([label,ch])=>(
+          <button key={ch} className="opbtn"
+            onPointerDown={e=>e.preventDefault()} onMouseDown={e=>e.preventDefault()}
+            onClick={()=>appendOp(p.id,ch)}>{label}</button>))}
+      </div>)}
+      {isOpen && (<div className="pbody">
+        {es.length===0 && <div style={{color:"var(--muted)",fontSize:12,padding:"4px 0"}}>No entries yet.</div>}
+        {es.map(e=>{ const r=evalExpr(e.expr); const showEq=/[-+*/()]/.test(e.expr)&&!r.empty; const bad=!r.empty&&!isFinite(r.v);
+          return (<div className="erow" key={e.id}>
+            <span className="eexpr">{e.expr||"—"}</span>
+            {showEq && <span className={"eeq"+(bad?" bad":"")}>{bad?"?":"= "+fmt(r.v)}</span>}
+            {!isRecount && e.counter && <span className="eby">{e.counter}</span>}
+            <button className="edel" onClick={()=>doDel(e.id)}>×</button></div>); })}
+        <div className="psub"><span>{es.length} {es.length===1?"entry":"entries"}</span><b>{fmt(t)}</b></div></div>)}
+    </div>);
+  }
+
+  const authPanelJsx = authPanel && (<div className="scrim" onClick={()=>setAuthPanel(null)}>
+    <div className="panel" onClick={e=>e.stopPropagation()}><div className="grip"></div>
+      <div className="ptitle disp">{authPanel.mode==='create'?'Start count':'Join count'}</div>
+      <div style={{fontSize:13,color:'var(--muted)',marginBottom:14}}>{authPanel.label}</div>
+      {!counter && <div className="field"><label>Your name</label>
+        <input value={authName} placeholder="e.g. Steve" autoFocus
+          onChange={e=>{ setAuthName(e.target.value); setAuthError(''); }}/></div>}
+      {authPanel.mode==='create' ? (<>
+        <div className="field"><label>Set a PIN</label>
+          <input value={authPin} type="tel" inputMode="numeric" maxLength={4} placeholder="4 digits"
+            onChange={e=>{ setAuthPin(e.target.value.replace(/\D/g,'').slice(0,4)); setAuthError(''); }}/></div>
+        <div className="field"><label>Confirm PIN</label>
+          <input value={authPinConfirm} type="tel" inputMode="numeric" maxLength={4} placeholder="Repeat PIN"
+            onChange={e=>{ setAuthPinConfirm(e.target.value.replace(/\D/g,'').slice(0,4)); setAuthError(''); }}/></div>
+      </>) : (
+        <div className="field"><label>PIN</label>
+          <input value={authPin} type="tel" inputMode="numeric" maxLength={4} placeholder="Leave blank if no PIN set"
+            onChange={e=>{ setAuthPin(e.target.value.replace(/\D/g,'').slice(0,4)); setAuthError(''); }}/></div>
+      )}
+      {authError && <div style={{color:'var(--bad)',fontSize:13,marginBottom:10}}>{authError}</div>}
+      <button className="cta" onClick={handleAuthConfirm}>{authPanel.mode==='create'?'Start counting':'Join count'}</button>
+      <button className="cta ghost" style={{marginTop:8}} onClick={()=>setAuthPanel(null)}>Cancel</button>
+    </div></div>);
+  const toastJsx = toast ? <div className="toast">{toast}</div> : null;
+
+  if(!CONFIGURED) return (<><div className="config"><h2 className="disp">Almost there</h2>
+    <p style={{fontSize:14,lineHeight:1.5}}>Open <code>index.html</code> and paste your Supabase key into the <code>TALLY_CONFIG</code> block near the top, replacing <code>PASTE_YOUR_KEY_HERE</code>. Then redeploy.</p></div>{toastJsx}</>);
+
+  if(!ready || (busy && view!=="count")) return (<><div style={{padding:"80px 20px",textAlign:"center"}}>
+    <div className="spin"></div><div style={{color:"var(--muted)",fontSize:14}}>{busy?"Working…":"Connecting…"}</div></div>{toastJsx}</>);
+
+  /* HOME */
+  if(view==="home") return (<>
+    <div className="hero">
+      <h1 className="disp">Stock counts,<br/><em>without the paper.</em></h1>
+      <p>Start a fresh count from one of your sheets, or join a count already in progress with your team.</p>
+      <button className="bigcard alt" onClick={goPick}>
+        <span className="ic">▶</span>
+        <span><span className="t1">Start new count</span><span className="t2">Pick a count sheet (or upload one) and begin a new count</span></span></button>
+      <button className="bigcard" onClick={goJoin}>
+        <span className="ic">↪</span>
+        <span><span className="t1">Join a count</span><span className="t2">Open an ongoing or past count and add your numbers</span></span></button>
+    </div>{toastJsx}</>);
+
+  /* PICK SHEET (start) */
+  if(view==="pick") return (<>
+    <div className="topbar"><button className="iconbtn" onClick={goHome}>‹</button>
+      <div className="brand"><div className="b1 disp">New <em>count</em></div><div className="b2">Choose a count sheet to begin</div></div></div>
+    <div className="body">
+      <div className="drop" onClick={()=>fileRef.current.click()}>
+        <div className="big disp">Upload a new count sheet</div>
+        <div className="sm">PDF · categories &amp; products detected automatically</div>
+        <div className="sm" style={{marginTop:4,opacity:.75}}>Build {BUILD_ID}</div>
+        {uploadStatus && <div className="sm" style={{marginTop:6,color:"var(--accent2)",fontWeight:600}}>{uploadStatus}</div>}
+        <button className="cta" type="button">Choose PDF</button></div>
+      <input ref={fileRef} type="file" accept="application/pdf" style={{display:"none"}} onChange={onFile}/>
+      <div className="libttl">Use a saved sheet</div>
+      {sheets.length===0 && <div className="empty"><div className="e1">🗒️</div>No saved sheets yet — upload one above.</div>}
+      {sheets.map(s=>(<div className="lib" key={s.id} onClick={()=>startSession(s.id,s.label)}>
+        <div style={{flex:1,minWidth:0}}><div className="l1">{s.label}</div>
+          <div className="l2">{s.cat_count} categories · {s.prod_count} products · uploaded {new Date(s.created_at).toLocaleDateString()}</div></div>
+        <button className="ldel" onClick={e=>delSheetTemplate(s.id,e)}>×</button></div>))}
+      </div>{authPanelJsx}{toastJsx}</>);
+
+  /* PREVIEW */
+  if(view==="preview" && preview){ const tot=preview.categories.reduce((a,c)=>a+c.products.length,0);
+    return (<>
+      <div className="topbar"><button className="iconbtn" onClick={()=>{setPreview(null);setView("pick");}}>‹</button>
+        <div className="brand"><div className="b1 disp">Check &amp; <em>confirm</em></div>
+          <div className="b2">{preview.categories.length} categories · {tot} products found</div></div></div>
+      <div className="body">
+        <div style={{background:"var(--card)",border:"1px solid var(--line)",borderRadius:12,padding:14,marginBottom:12}}>
+          <div style={{fontWeight:700,fontSize:15}}>{preview.label||"Count sheet"}</div>
+          <div style={{fontSize:12,color:"var(--muted)",marginTop:4}}>
+            {preview.meta.taker && <>Stock taker: {preview.meta.taker} · </>}{preview.meta.printed && <>printed {preview.meta.printed}</>}</div></div>
+        <div className="pvwrap">{preview.categories.map(c=>(<div key={c.id}>
+          <div className="pvcat"><span className="n">{c.code}</span>{c.name}<span className="c">{c.products.length}</span></div>
+          {c.products.map(p=><div className="pvp" key={p.id}>{p.name}</div>)}</div>))}</div></div>
+      <div style={{position:"sticky",bottom:0,padding:"12px 14px",background:"var(--paper)",borderTop:"1px solid var(--line)"}}>
+        <button className="cta" onClick={confirmImport}>Save sheet &amp; start counting</button>
+        <button className="cta ghost" style={{marginTop:8}} onClick={()=>{setPreview(null);setView("pick");}}>Cancel</button></div>{toastJsx}</>); }
+
+  /* JOIN (sessions list) */
+  if(view==="join") return (<>
+    <div className="topbar"><button className="iconbtn" onClick={goHome}>‹</button>
+      <div className="brand"><div className="b1 disp">Join a <em>count</em></div><div className="b2">Most recent first</div></div></div>
+    <div className="body">
+      {sessions.length===0 && <div className="empty"><div className="e1">📋</div>No counts yet. Start one from the home screen.</div>}
+      {sessions.map(s=>(<div className="lib" key={s.id} onClick={()=>{
+        setAuthName(counter); setAuthPin(localStorage.getItem('tally_pin_'+s.id)||''); setAuthPinConfirm(''); setAuthError('');
+        setAuthPanel({mode:'join', id:s.id, label:s.label});
+      }}>
+        <div style={{flex:1,minWidth:0}}><div className="l1">{s.label}</div>
+          <div className="l2">Started {when(s.created_at)}</div>
+          {sessionCounters[s.id]?.length>0 && <div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:5}}>
+            {sessionCounters[s.id].map(n=><span key={n} className="eby">{n}</span>)}</div>}</div>
+        <button className="ldel" onClick={e=>delSessionRow(s.id,e)}>×</button></div>))}
+      </div>{authPanelJsx}{toastJsx}</>);
+
+  /* COUNT */
+  if(view==="count" && sheet && session){
+    const cats=sheet.categories; const isTot=activeCat==="totals"; const cat=cats.find(c=>c.id===activeCat);
+    const grand=cats.reduce((a,c)=>a+c.products.reduce((s,p)=>s+productTotal(p.id),0),0);
+    const recountProducts=cats.flatMap(c=>c.products.filter(p=>flagged.has(p.id)).map(p=>({...p,catCode:c.code,catName:c.name})));
+    return (<><div className="count-shell">
+      <div className="topbar"><button className="iconbtn" onClick={goHome}>‹</button>
+        <div className="brand"><div className="b1 disp">{sheet.label}</div><div className="b2">Count started {when(session.created_at)}</div></div>
+        <div className="live"><span className={"dot"+(isOnline?(synced?" on":""):" offln")}></span>{isOnline?(synced?(pendingCount>0?`${pendingCount} syncing…`:"Auto-sync"):(pendingCount>0?`${pendingCount} pending`:"…")):(pendingCount>0?`Offline · ${pendingCount} pending`:"Offline")}</div>
+        <button className="iconbtn" onClick={()=>setMenu(true)}>⋯</button></div>
+      <div className="tabs">
+        {cats.map(c=>{ const cnt=c.products.filter(p=>productTotal(p.id)!==0).length;
+          return (<button key={c.id} className={"tab"+(activeCat===c.id?" on":"")} onClick={()=>setActiveCat(c.id)}>
+            <span className="num">{c.code}</span>{c.name}{cnt>0 && <span className="cnt">{cnt}</span>}</button>); })}
+        {flagged.size>0 && <button className={"tab recount"+(activeCat==='recounts'?" on":"")} onClick={()=>setActiveCat('recounts')}>⚑ Recounts<span className="cnt">{flagged.size}</span></button>}
+        <button className={"tab tot"+(isTot?" on":"")} onClick={()=>setActiveCat("totals")}>Σ Totals</button></div>
+      <div className="count-scroll">
+        {!isTot && activeCat!=='recounts' && cat && (<>
+          <div className="cathead disp"><span className="num">{cat.code}</span>{cat.name}</div>
+          {cat.products.map(p=>renderProw(p))}
+        </>)}
+        {activeCat==='recounts' && (<>
+          <div className="cathead disp" style={{color:'var(--bad)'}}>⚑ Flagged for recount</div>
+          {recountProducts.length===0 && <div className="empty"><div className="e1">⚑</div>No items flagged yet — tap ⚑ on any product.</div>}
+          {recountProducts.map(p=>renderProw(p, p.catCode, true))}
+        </>)}
+        {isTot && (<>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",margin:"6px 4px 2px"}}>
+            <div className="libttl" style={{margin:0}}>Totals · sheet order</div></div>
+          {cats.map(c=>{ const prods=c.products; if(!prods.length) return null;
+            const sub=c.products.reduce((a,p)=>a+productTotal(p.id),0);
+            return (<div key={c.id}><div className="tcat disp"><span><span style={{color:"var(--accent)",fontSize:12}}>{c.code}</span> {c.name}</span><span className="ts">{fmt(sub)}</span></div>
+              {prods.map(p=>(<div className="trow" key={p.id}><span className="tn">{p.name}</span><span className="tv">{fmt(productTotal(p.id))}</span></div>))}</div>); })}
+          {grand===0 && <div className="empty"><div className="e1">📦</div>No counts entered yet.</div>}</>)}
+      </div>
+      {menu && (<div className="scrim" onClick={()=>setMenu(false)}>
+        <div className="panel" onClick={e=>e.stopPropagation()}><div className="grip"></div>
+          <div className="ptitle disp">Count options</div>
+          <div className="field"><label>Your name (tags your entries)</label>
+            <input value={counter} placeholder="e.g. Steve" onChange={e=>saveCounter(e.target.value)}/></div>
+          <button className="mbtn" onClick={()=>{ const v=!soundOn; setSoundOn(v); localStorage.setItem('tally_sound',v?'on':'off'); }}>
+            {soundOn ? '♪ Entry sound: On' : '♪ Entry sound: Off'}</button>
+          <button className="mbtn" onClick={exportCsv}>⤓ Export totals (CSV)</button>
+          <button className="mbtn danger" onClick={delCurrentSession}>Delete this count</button>
+          <div style={{fontSize:11,color:"var(--muted)",marginTop:6,lineHeight:1.5}}>Everyone who joins this count adds into the same totals, re-synced every few seconds. Share the web address and have each person set their name.</div>
+        </div></div>)}
+    </div>{toastJsx}</>); }
+  return null;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
