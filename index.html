@@ -49,10 +49,18 @@
   .floatbtn-left{left:12px}
   .floatbtn-right{right:12px}
   .livebadge{position:absolute;top:-1px;right:-1px;width:9px;height:9px;border:1.5px solid var(--card)}
-  .catfab{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);z-index:35;display:flex;align-items:center;gap:5px;border:1.5px solid var(--ink);border-radius:999px;background:var(--card);padding:8px 14px 8px 11px;box-shadow:var(--shadow);font-weight:700;font-size:12.5px;color:var(--ink)}
-  .catfab:active{transform:translateX(-50%) translateY(1px)}
+  .navcenter{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);z-index:35;display:flex;align-items:center;gap:8px}
+  .catfab{display:flex;align-items:center;gap:5px;border:1.5px solid var(--ink);border-radius:999px;background:var(--card);padding:8px 14px 8px 11px;box-shadow:var(--shadow);font-weight:700;font-size:12.5px;color:var(--ink)}
+  .catfab:active{transform:translateY(1px)}
   .catfab-ic{font-size:16px;line-height:1}
   .catfab-code{font-family:"IBM Plex Mono";color:var(--accent2)}
+  .searchbtn{border:1.5px solid var(--ink);border-radius:999px;background:var(--card);width:36px;height:36px;display:grid;place-items:center;font-size:15px;color:var(--ink);box-shadow:var(--shadow);padding:0;flex:none}
+  .searchbtn:active{transform:translateY(1px)}
+  .searchbar{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:12px;right:12px;z-index:35;display:flex;align-items:center;gap:8px;border:1.5px solid var(--ink);border-radius:999px;background:var(--card);padding:6px 6px 6px 14px;box-shadow:var(--shadow)}
+  .searchbar input{flex:1;border:none;outline:none;background:transparent;font-size:16px;font-family:inherit;color:var(--ink);min-width:0}
+  .searchbar input::placeholder{color:var(--muted)}
+  .searchclose{border:none;background:var(--chip);color:var(--ink);border-radius:999px;width:28px;height:28px;display:grid;place-items:center;font-size:16px;flex:none;padding:0}
+  .searchclose:active{background:var(--line)}
   .catrow{width:100%;border:1.5px solid var(--line);background:var(--card);border-radius:11px;padding:12px 14px;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px;color:var(--ink)}
   .catrow .num{font-size:11px;color:var(--accent);background:var(--chip);padding:2px 7px;border-radius:6px;margin-right:8px;font-family:"IBM Plex Mono"}
   .catrow .cnt{font-size:11px;background:var(--chip);border-radius:999px;padding:2px 8px;color:var(--accent2);font-family:"IBM Plex Mono"}
@@ -322,6 +330,8 @@ function App(){
   const [busy,setBusy]=useState(false);
   const [menu,setMenu]=useState(false);
   const [catPicker,setCatPicker]=useState(false);
+  const [searchOpen,setSearchOpen]=useState(false);
+  const [searchQuery,setSearchQuery]=useState('');
   const [toast,setToast]=useState("");
   const [uploadStatus,setUploadStatus]=useState("");
   const [showAll,setShowAll]=useState(false);
@@ -334,7 +344,7 @@ function App(){
   const [authPin,setAuthPin]=useState('');
   const [authPinConfirm,setAuthPinConfirm]=useState('');
   const [authError,setAuthError]=useState('');
-  const fileRef=useRef(); const pollRef=useRef(); const focusRef=useRef(null);
+  const fileRef=useRef(); const pollRef=useRef(); const focusRef=useRef(null); const pendingScrollPidRef=useRef(null);
   const saveTs=useRef({}); const dirtyRef=useRef(new Set()); const flushQueueRef=useRef(null); const flagDirtyRef=useRef(false); const flushingRef=useRef(false);
   const draftSaveTimerRef=useRef(null); const audioCtxRef=useRef(null); const offlineChimeRef=useRef(null);
 
@@ -374,6 +384,11 @@ function App(){
     window.addEventListener('pagehide',onHide);
     return ()=>{ clearTimeout(draftSaveTimerRef.current); window.removeEventListener('pagehide',onHide); };
   },[drafts,session]);
+  useEffect(()=>{
+    if(!pendingScrollPidRef.current) return;
+    const pid=pendingScrollPidRef.current; pendingScrollPidRef.current=null;
+    requestAnimationFrame(()=>{ document.getElementById('prow-'+pid)?.scrollIntoView({block:'center',behavior:'smooth'}); });
+  },[activeCat,searchOpen]);
   useEffect(()=>{
     const onUnload=e=>{ const q=JSON.parse(localStorage.getItem('tally_queue')||'[]'); if(q.length||dirtyRef.current.size>0){ e.preventDefault(); e.returnValue=''; } };
     window.addEventListener('beforeunload',onUnload);
@@ -663,6 +678,10 @@ function App(){
     try{ await sb.from("counts").delete().eq("id",id); }catch(e){ enqueue(); }
   }
   function toggle(pid){ setOpen(o=>({...o,[pid]:!o[pid]})); }
+  function onSearchAdd(pid,catId){
+    setActiveCat(catId); pendingScrollPidRef.current=pid;
+    setSearchOpen(false); setSearchQuery('');
+  }
   async function toggleFlag(pid){
     const n=new Set(flagged); n.has(pid)?n.delete(pid):n.add(pid);
     const arr=[...n]; setFlagged(n);
@@ -747,13 +766,13 @@ function App(){
 
   flushQueueRef.current=flushQueue;
 
-  function renderProw(p, catBadge=null, isRecount=false){
+  function renderProw(p, catBadge=null, isRecount=false, onAdded=null){
     const es = isRecount ? (recountCounts[p.id]||[]) : entriesOf(p.id);
     const t = isRecount ? es.reduce((a,e)=>{ const r=evalExpr(e.expr); return a+(isFinite(r.v)?r.v:0); },0) : productTotal(p.id);
     const isOpen=!!open[p.id]; const draft=drafts[p.id]||""; const isFlagged=flagged.has(p.id);
-    const doAdd=()=>{ isRecount ? addRecountEntry(p.id,draft) : addQuickEntry(p.id,draft); };
+    const doAdd=()=>{ isRecount ? addRecountEntry(p.id,draft) : addQuickEntry(p.id,draft); if(onAdded) onAdded(); };
     const doDel=(id)=>{ isRecount ? delRecountEntry(p.id,id) : delEntry(p.id,id); };
-    return (<div className={"prow"+(isOpen?" open":"")+(isFlagged?" flagged":"")+(p.id===lastPid?" last":"")} key={p.id}>
+    return (<div id={"prow-"+p.id} className={"prow"+(isOpen?" open":"")+(isFlagged?" flagged":"")+(p.id===lastPid?" last":"")} key={p.id}>
       <div className="phead">
         <div className="phead-toggle" onClick={()=>toggle(p.id)}><span className="pchev">▶</span>
           <span className={"pname"+(focusedPid===p.id?" focused":"")}>{p.name}</span>{catBadge && <span className="cat-badge">{catBadge}</span>}</div>
@@ -888,31 +907,51 @@ function App(){
     const cats=sheet.categories; const isTot=activeCat==="totals"; const cat=cats.find(c=>c.id===activeCat);
     const grand=cats.reduce((a,c)=>a+c.products.reduce((s,p)=>s+productTotal(p.id),0),0);
     const recountProducts=cats.flatMap(c=>c.products.filter(p=>flagged.has(p.id)).map(p=>({...p,catCode:c.code,catName:c.name})));
+    const searchQ=searchQuery.trim().toLowerCase();
+    const searchMatches=searchQ ? cats.flatMap(c=>c.products.filter(p=>p.name.toLowerCase().includes(searchQ)).map(p=>({...p,catCode:c.code,catId:c.id}))) : [];
     return (<><div className="count-shell">
-      <button className="floatbtn floatbtn-left" onClick={goHome}>‹</button>
-      <button className="catfab" onClick={()=>setCatPicker(true)}>
-        <span className="catfab-ic">🍾</span>
-        <span className="catfab-code">{isTot?"Σ":activeCat==='recounts'?"⚑":(cat?cat.code:"")}</span>
-      </button>
-      <button className="floatbtn floatbtn-right" onClick={()=>setMenu(true)}>⋯
-        <span className={"dot livebadge"+(isOnline?(synced?" on":""):" offln")}></span></button>
+      {searchOpen ? (
+        <div className="searchbar">
+          <span style={{fontSize:15}}>🔍</span>
+          <input autoFocus value={searchQuery} placeholder="Search all products…"
+            onChange={e=>setSearchQuery(e.target.value)}/>
+          <button className="searchclose" onClick={()=>{setSearchOpen(false);setSearchQuery('');}}>×</button>
+        </div>
+      ) : (<>
+        <button className="floatbtn floatbtn-left" onClick={goHome}>‹</button>
+        <div className="navcenter">
+          <button className="catfab" onClick={()=>setCatPicker(true)}>
+            <span className="catfab-ic">🍾</span>
+            <span className="catfab-code">{isTot?"Σ":activeCat==='recounts'?"⚑":(cat?cat.code:"")}</span>
+          </button>
+          <button className="searchbtn" onClick={()=>setSearchOpen(true)}>🔍</button>
+        </div>
+        <button className="floatbtn floatbtn-right" onClick={()=>setMenu(true)}>⋯
+          <span className={"dot livebadge"+(isOnline?(synced?" on":""):" offln")}></span></button>
+      </>)}
       <div className="count-scroll">
-        {!isTot && activeCat!=='recounts' && cat && (<>
-          {cat.products.map(p=>renderProw(p))}
+        {searchOpen ? (<>
+          {!searchQ && <div className="empty"><div className="e1">🔍</div>Type to search products across all categories.</div>}
+          {searchQ && searchMatches.length===0 && <div className="empty"><div className="e1">🔍</div>No products match "{searchQuery.trim()}".</div>}
+          {searchMatches.map(p=>renderProw(p, p.catCode, false, ()=>onSearchAdd(p.id, p.catId)))}
+        </>) : (<>
+          {!isTot && activeCat!=='recounts' && cat && (<>
+            {cat.products.map(p=>renderProw(p))}
+          </>)}
+          {activeCat==='recounts' && (<>
+            <div className="cathead disp" style={{color:'var(--bad)'}}>⚑ Flagged for recount</div>
+            {recountProducts.length===0 && <div className="empty"><div className="e1">⚑</div>No items flagged yet — tap ⚑ on any product.</div>}
+            {recountProducts.map(p=>renderProw(p, p.catCode, true))}
+          </>)}
+          {isTot && (<>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",margin:"6px 4px 2px"}}>
+              <div className="libttl" style={{margin:0}}>Totals · sheet order</div></div>
+            {cats.map(c=>{ const prods=c.products; if(!prods.length) return null;
+              const sub=c.products.reduce((a,p)=>a+productTotal(p.id),0);
+              return (<div key={c.id}><div className="tcat disp"><span><span style={{color:"var(--accent)",fontSize:12}}>{c.code}</span> {c.name}</span><span className="ts">{fmt(sub)}</span></div>
+                {prods.map(p=>(<div className="trow" key={p.id}><span className="tn">{p.name}</span><span className="tv">{fmt(productTotal(p.id))}</span></div>))}</div>); })}
+            {grand===0 && <div className="empty"><div className="e1">📦</div>No counts entered yet.</div>}</>)}
         </>)}
-        {activeCat==='recounts' && (<>
-          <div className="cathead disp" style={{color:'var(--bad)'}}>⚑ Flagged for recount</div>
-          {recountProducts.length===0 && <div className="empty"><div className="e1">⚑</div>No items flagged yet — tap ⚑ on any product.</div>}
-          {recountProducts.map(p=>renderProw(p, p.catCode, true))}
-        </>)}
-        {isTot && (<>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",margin:"6px 4px 2px"}}>
-            <div className="libttl" style={{margin:0}}>Totals · sheet order</div></div>
-          {cats.map(c=>{ const prods=c.products; if(!prods.length) return null;
-            const sub=c.products.reduce((a,p)=>a+productTotal(p.id),0);
-            return (<div key={c.id}><div className="tcat disp"><span><span style={{color:"var(--accent)",fontSize:12}}>{c.code}</span> {c.name}</span><span className="ts">{fmt(sub)}</span></div>
-              {prods.map(p=>(<div className="trow" key={p.id}><span className="tn">{p.name}</span><span className="tv">{fmt(productTotal(p.id))}</span></div>))}</div>); })}
-          {grand===0 && <div className="empty"><div className="e1">📦</div>No counts entered yet.</div>}</>)}
       </div>
       {catPicker && (<div className="scrim" onClick={()=>setCatPicker(false)}>
         <div className="panel" onClick={e=>e.stopPropagation()}><div className="grip"></div>
