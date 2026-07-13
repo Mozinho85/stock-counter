@@ -41,18 +41,28 @@
   .live{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--muted);flex:none}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:.3s}
   .dot.on{background:var(--good);box-shadow:0 0 0 3px rgba(47,125,79,.18)}
-  .tabs{position:sticky;top:60px;z-index:20;display:flex;gap:6px;overflow-x:auto;padding:10px 12px;background:var(--paper);border-bottom:1px solid var(--line);scrollbar-width:none}
-  .tabs::-webkit-scrollbar{display:none}
-  .tab{flex:none;border:1.5px solid var(--line);background:var(--card);color:var(--muted);padding:7px 13px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap;display:flex;align-items:center;gap:7px;transition:.12s}
-  .tab .num{font-size:10px;opacity:.7}
-  .tab .cnt{font-size:11px;background:var(--chip);border-radius:999px;padding:1px 6px;color:var(--accent2)}
-  .tab.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
-  .tab.on .cnt{background:var(--accent);color:#fff}
-  .tab.tot{border-color:var(--accent);color:var(--accent)}
-  .tab.tot.on{background:var(--accent);color:#fff;border-color:var(--accent)}
   .body{flex:1;padding:8px 12px 90px}
   .count-shell{display:flex;flex-direction:column;height:100vh;height:100dvh}
-  .count-scroll{flex:1;overflow-y:auto;min-height:0;padding:8px 12px 500px}
+  .count-scroll{flex:1;overflow-y:auto;min-height:0;padding:calc(env(safe-area-inset-top,0px) + 54px) 12px 500px}
+  .floatbtn{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);z-index:35;width:36px;height:36px;border:1.5px solid var(--ink);border-radius:999px;background:var(--card);display:grid;place-items:center;font-size:17px;color:var(--ink);box-shadow:var(--shadow);padding:0}
+  .floatbtn:active{transform:translateY(1px)}
+  .floatbtn-left{left:12px}
+  .floatbtn-right{right:12px}
+  .livebadge{position:absolute;top:-1px;right:-1px;width:9px;height:9px;border:1.5px solid var(--card)}
+  .catfab{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);z-index:35;display:flex;align-items:center;gap:5px;border:1.5px solid var(--ink);border-radius:999px;background:var(--card);padding:8px 14px 8px 11px;box-shadow:var(--shadow);font-weight:700;font-size:12.5px;color:var(--ink)}
+  .catfab:active{transform:translateX(-50%) translateY(1px)}
+  .catfab-ic{font-size:16px;line-height:1}
+  .catfab-code{font-family:"IBM Plex Mono";color:var(--accent2)}
+  .catrow{width:100%;border:1.5px solid var(--line);background:var(--card);border-radius:11px;padding:12px 14px;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px;color:var(--ink)}
+  .catrow .num{font-size:11px;color:var(--accent);background:var(--chip);padding:2px 7px;border-radius:6px;margin-right:8px;font-family:"IBM Plex Mono"}
+  .catrow .cnt{font-size:11px;background:var(--chip);border-radius:999px;padding:2px 8px;color:var(--accent2);font-family:"IBM Plex Mono"}
+  .catrow.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .catrow.on .num{background:rgba(255,255,255,.15);color:var(--paper)}
+  .catrow.on .cnt{background:var(--accent);color:#fff}
+  .catrow.recount{border-color:var(--bad);color:var(--bad)}
+  .catrow.recount.on{background:var(--bad);color:#fff;border-color:var(--bad)}
+  .catrow.tot{border-color:var(--accent);color:var(--accent)}
+  .catrow.tot.on{background:var(--accent);color:#fff;border-color:var(--accent)}
   .cathead{font-family:"Bricolage Grotesque";font-weight:800;font-size:15px;margin:10px 4px 6px;display:flex;align-items:baseline;gap:8px}
   .cathead .num{font-size:11px;color:var(--accent);background:var(--chip);padding:2px 7px;border-radius:6px}
   .prow{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:4px;overflow:hidden}
@@ -145,8 +155,6 @@
   .prow.flagged{border-color:var(--bad);background:#fdf8f7}
   .pflag{border:none;background:none;font-size:15px;line-height:1;padding:2px 4px;flex:none;color:var(--muted);transition:.12s}
   .pflag.on{color:var(--bad)}
-  .tab.recount{border-color:var(--bad);color:var(--bad)}
-  .tab.recount.on{background:var(--bad);color:#fff;border-color:var(--bad)}
   .cat-badge{font-size:10px;color:var(--accent2);background:var(--chip);border-radius:5px;padding:1px 5px;margin-left:5px;font-family:"IBM Plex Mono";flex:none}
   .config{margin:40px 16px;background:var(--card);border:1.5px solid var(--bad);border-radius:14px;padding:20px}
   .config h2{font-family:"Bricolage Grotesque";margin:0 0 8px;color:var(--bad)}
@@ -313,6 +321,7 @@ function App(){
   const [counter,setCounter]=useState(localStorage.getItem("tally_counter")||"");
   const [busy,setBusy]=useState(false);
   const [menu,setMenu]=useState(false);
+  const [catPicker,setCatPicker]=useState(false);
   const [toast,setToast]=useState("");
   const [uploadStatus,setUploadStatus]=useState("");
   const [showAll,setShowAll]=useState(false);
@@ -855,7 +864,7 @@ function App(){
           {c.products.map(p=><div className="pvp" key={p.id}>{p.name}</div>)}</div>))}</div></div>
       <div style={{position:"sticky",bottom:0,padding:"12px 14px",background:"var(--paper)",borderTop:"1px solid var(--line)"}}>
         <button className="cta" onClick={confirmImport}>Save sheet &amp; start counting</button>
-        <button className="cta ghost" style={{marginTop:8}} onClick={()=>{setPreview(null);setView("pick");}}>Cancel</button></div>{toastJsx}</>); }
+        <button className="cta ghost" style={{marginTop:8}} onClick={()=>{setPreview(null);setView("pick");}}>Cancel</button></div>{authPanelJsx}{toastJsx}</>); }
 
   /* JOIN (sessions list) */
   if(view==="join") return (<>
@@ -880,19 +889,15 @@ function App(){
     const grand=cats.reduce((a,c)=>a+c.products.reduce((s,p)=>s+productTotal(p.id),0),0);
     const recountProducts=cats.flatMap(c=>c.products.filter(p=>flagged.has(p.id)).map(p=>({...p,catCode:c.code,catName:c.name})));
     return (<><div className="count-shell">
-      <div className="topbar"><button className="iconbtn" onClick={goHome}>‹</button>
-        <div className="brand"><div className="b1 disp">{sheet.label}</div><div className="b2">Count started {when(session.created_at)}</div></div>
-        <div className="live"><span className={"dot"+(isOnline?(synced?" on":""):" offln")}></span>{isOnline?(synced?(pendingCount>0?`${pendingCount} syncing…`:"Auto-sync"):(pendingCount>0?`${pendingCount} pending`:"…")):(pendingCount>0?`Offline · ${pendingCount} pending`:"Offline")}</div>
-        <button className="iconbtn" onClick={()=>setMenu(true)}>⋯</button></div>
-      <div className="tabs">
-        {cats.map(c=>{ const cnt=c.products.filter(p=>productTotal(p.id)!==0).length;
-          return (<button key={c.id} className={"tab"+(activeCat===c.id?" on":"")} onClick={()=>setActiveCat(c.id)}>
-            <span className="num">{c.code}</span>{c.name}{cnt>0 && <span className="cnt">{cnt}</span>}</button>); })}
-        {flagged.size>0 && <button className={"tab recount"+(activeCat==='recounts'?" on":"")} onClick={()=>setActiveCat('recounts')}>⚑ Recounts<span className="cnt">{flagged.size}</span></button>}
-        <button className={"tab tot"+(isTot?" on":"")} onClick={()=>setActiveCat("totals")}>Σ Totals</button></div>
+      <button className="floatbtn floatbtn-left" onClick={goHome}>‹</button>
+      <button className="catfab" onClick={()=>setCatPicker(true)}>
+        <span className="catfab-ic">🍾</span>
+        <span className="catfab-code">{isTot?"Σ":activeCat==='recounts'?"⚑":(cat?cat.code:"")}</span>
+      </button>
+      <button className="floatbtn floatbtn-right" onClick={()=>setMenu(true)}>⋯
+        <span className={"dot livebadge"+(isOnline?(synced?" on":""):" offln")}></span></button>
       <div className="count-scroll">
         {!isTot && activeCat!=='recounts' && cat && (<>
-          <div className="cathead disp"><span className="num">{cat.code}</span>{cat.name}</div>
           {cat.products.map(p=>renderProw(p))}
         </>)}
         {activeCat==='recounts' && (<>
@@ -909,9 +914,25 @@ function App(){
               {prods.map(p=>(<div className="trow" key={p.id}><span className="tn">{p.name}</span><span className="tv">{fmt(productTotal(p.id))}</span></div>))}</div>); })}
           {grand===0 && <div className="empty"><div className="e1">📦</div>No counts entered yet.</div>}</>)}
       </div>
+      {catPicker && (<div className="scrim" onClick={()=>setCatPicker(false)}>
+        <div className="panel" onClick={e=>e.stopPropagation()}><div className="grip"></div>
+          <div className="ptitle disp">{sheet.label}</div>
+          {cats.map(c=>{ const cnt=c.products.filter(p=>productTotal(p.id)!==0).length;
+            return (<button key={c.id} className={"catrow"+(activeCat===c.id?" on":"")} onClick={()=>{setActiveCat(c.id);setCatPicker(false);}}>
+              <span><span className="num">{c.code}</span>{c.name}</span>{cnt>0 && <span className="cnt">{cnt}</span>}</button>); })}
+          {flagged.size>0 && <button className={"catrow recount"+(activeCat==='recounts'?" on":"")} onClick={()=>{setActiveCat('recounts');setCatPicker(false);}}>
+            <span>⚑ Recounts</span><span className="cnt">{flagged.size}</span></button>}
+          <button className={"catrow tot"+(isTot?" on":"")} onClick={()=>{setActiveCat("totals");setCatPicker(false);}}>
+            <span>Σ Totals</span></button>
+        </div></div>)}
       {menu && (<div className="scrim" onClick={()=>setMenu(false)}>
         <div className="panel" onClick={e=>e.stopPropagation()}><div className="grip"></div>
           <div className="ptitle disp">Count options</div>
+          <div style={{fontSize:12,color:"var(--muted)",marginTop:-8,marginBottom:14}}>{sheet.label} · Started {when(session.created_at)}</div>
+          <div style={{fontSize:12,color:"var(--muted)",marginBottom:14,display:"flex",alignItems:"center",gap:6}}>
+            <span className={"dot"+(isOnline?(synced?" on":""):" offln")}></span>
+            {isOnline?(synced?(pendingCount>0?`${pendingCount} syncing…`:"Auto-sync — all entries saved"):(pendingCount>0?`${pendingCount} pending`:"…")):(pendingCount>0?`Offline · ${pendingCount} pending`:"Offline")}
+          </div>
           <div className="field"><label>Your name (tags your entries)</label>
             <input value={counter} placeholder="e.g. Steve" onChange={e=>saveCounter(e.target.value)}/></div>
           <button className="mbtn" onClick={()=>{ const v=!soundOn; setSoundOn(v); localStorage.setItem('tally_sound',v?'on':'off'); }}>
